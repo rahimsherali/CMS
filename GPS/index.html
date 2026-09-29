@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>GP Case Management</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#667085}body{min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:12px}.phone{position:relative;width:min(412px,100vw);aspect-ratio:412/917;overflow:hidden;background:#fff;border-radius:28px;box-shadow:0 12px 45px #0002}.screen{position:absolute;inset:0;display:none}.screen.active{display:block}.screen>img.bg{width:100%;height:100%;display:block;object-fit:cover}.hot{position:absolute;cursor:pointer;background:transparent;border:0;padding:0}.hot:focus{outline:2px solid #4163a5;outline-offset:2px}.overlay{position:absolute;inset:0;pointer-events:none}.overlay>*{pointer-events:auto}.toast{position:absolute;left:18px;right:18px;bottom:92px;background:#314f91;color:#fff;padding:11px 14px;border-radius:14px;text-align:center;font-size:13px;box-shadow:0 6px 20px #0002;display:none;z-index:50}.toast.show{display:block}
+/* referral interactions */
+.search-input{position:absolute;left:24px;top:134px;width:364px;height:40px;border:0;background:transparent;outline:0;padding:0 15px 0 44px;color:#667085;font-size:14px}.search-input::placeholder{color:transparent}.filter-btn{position:absolute;top:191px;height:40px;border:0;background:transparent;border-radius:14px;color:transparent;font-size:14px}.f-new{left:24px;width:78px}.f-progress{left:112px;width:128px}.f-completed{left:250px;width:120px}.dynamic-filters{position:absolute;left:24px;top:191px;right:24px;height:40px;display:flex;gap:10px;z-index:4}.dynamic-filters button{border:1px solid #e0e4eb;background:#fff;color:#667085;border-radius:14px;font-size:14px;height:40px;padding:0 15px;flex:1}.dynamic-filters button.active{background:#a9c2f5;border-color:#a9c2f5;color:#42629b}.dynamic-list{position:absolute;left:24px;right:24px;top:247px;bottom:145px;z-index:3;overflow:hidden}.ref-card{height:96px;border:1px solid #d5d8dd;border-radius:20px;background:#fff;margin-bottom:10px;padding:15px 17px;position:relative;box-shadow:0 1px 1px #00000005}.ref-card .name{font-weight:700;color:#3e5f9d;font-size:17px}.ref-card .id{font-size:13px;margin-top:4px}.ref-card .meta{font-size:13px;margin-top:7px}.badge{position:absolute;right:16px;top:17px;padding:3px 10px;border-radius:10px;font-size:11px}.crisis{background:#ffd9dd;color:#d97880}.high{background:#fff0f0;color:#e38a8a;border:1px solid #f5cccc}.moderate{background:#ffedcf;color:#d39a58}.low{background:#e3f5f4;color:#54aaa5}.due{background:#dceeff;color:#62a9e2}.arrow{position:absolute;right:17px;bottom:14px;font-size:20px;color:#a9afb8}.bottom-hot{bottom:17px;height:64px}.bh-home{left:24px;width:82px}.bh-tasks{left:106px;width:82px}.bh-cases{left:188px;width:82px}.bh-appt{left:270px;width:118px}
+/* forms: allow native inputs over screenshot */
+.form-input{position:absolute;border:1px solid #e1e4e8;border-radius:10px;background:#fff;padding:0 10px;font-size:13px;color:#667085;outline:none}.form-select{position:absolute;border:1px solid #e1e4e8;border-radius:10px;background:#fff;padding:0 9px;font-size:13px;color:#667085}.save-hot{left:205px;bottom:17px;width:105px;height:42px}.cancel-hot{left:100px;bottom:17px;width:95px;height:42px}
+@media(max-width:412px){body{padding:0}.phone{border-radius:0;box-shadow:none}}
+</style></head><body>
+<div class="phone" id="app">
+  <section class="screen active" id="dashboard"><img class="bg" src="GP Dashboard.jpg"><div class="overlay">
+    <button class="hot" style="left:25px;top:138px;width:176px;height:116px" onclick="go('referrals')"></button>
+    <button class="hot" style="left:212px;top:138px;width:176px;height:116px" onclick="go('detail')"></button>
+    <button class="hot" style="left:25px;top:269px;width:176px;height:116px" onclick="go('followup')"></button>
+    <button class="hot" style="left:212px;top:269px;width:176px;height:116px" onclick="go('detail')"></button>
+    <button class="hot" style="left:24px;top:402px;width:364px;height:76px" onclick="go('referrals')"></button>
+    <button class="hot" style="left:24px;top:494px;width:364px;height:78px" onclick="go('detail')"></button>
+    <button class="hot bottom-hot bh-appt" onclick="go('referrals')"></button>
+  </div></section>
+
+  <section class="screen" id="referrals"><img class="bg" src="GP Referrals.png"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:42px;height:42px" onclick="go('dashboard')"></button>
+    <input id="search" class="search-input" placeholder="Search by name or case ID..." oninput="renderRefs()">
+    <div class="dynamic-filters"><button data-filter="New" onclick="setFilter('New')">New (5)</button><button data-filter="In Progress" onclick="setFilter('In Progress')">In Progress (10)</button><button data-filter="Completed" onclick="setFilter('Completed')">Completed (3)</button></div>
+    <div class="dynamic-list" id="refList"></div>
+    <button class="hot bottom-hot bh-home" onclick="go('dashboard')"></button><button class="hot bottom-hot bh-tasks" onclick="toast('Tasks opened')"></button><button class="hot bottom-hot bh-cases" onclick="go('detail')"></button><button class="hot bottom-hot bh-appt" onclick="go('referrals')"></button>
+  </div></section>
+
+  <section class="screen" id="accept"><img class="bg" src="GP Accept Referral.jpg"><div class="overlay">
+    <button class="hot" style="left:25px;top:58px;width:42px;height:42px" onclick="go('referrals')"></button>
+    <button class="hot" style="left:24px;top:790px;width:364px;height:58px" onclick="go('detail');toast('Referral accepted')"></button>
+    <button class="hot" style="left:24px;top:848px;width:176px;height:40px" onclick="go('referrals');toast('Referral declined')"></button>
+  </div></section>
+
+  <section class="screen" id="detail"><img class="bg" src="GP detail review.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:134px;width:364px;height:75px" onclick="go('overview')"></button>
+    <button class="hot" style="left:24px;top:219px;width:176px;height:122px" onclick="toast('Risk details')"></button>
+    <button class="hot" style="left:212px;top:219px;width:176px;height:122px" onclick="toast('Case status')"></button>
+    <button class="hot" style="left:24px;top:352px;width:364px;height:114px" onclick="go('overview')"></button>
+  </div></section>
+
+  <section class="screen" id="overview"><img class="bg" src="Patient Details Overview.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:42px;height:42px" onclick="go('detail')"></button>
+    <button class="hot" style="left:24px;top:111px;width:86px;height:38px" onclick="go('overview')"></button>
+    <button class="hot" style="left:110px;top:111px;width:96px;height:38px" onclick="go('clinical')"></button>
+    <button class="hot" style="left:207px;top:111px;width:94px;height:38px" onclick="go('medication')"></button>
+    <button class="hot" style="left:302px;top:111px;width:86px;height:38px" onclick="go('patient-referrals')"></button>
+    <button class="hot" style="left:48px;top:712px;width:316px;height:48px" onclick="go('clinical')"></button>
+  </div></section>
+
+  <section class="screen" id="clinical"><img class="bg" src="Patient Details Clinical Assessment.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:42px;height:42px" onclick="go('overview')"></button>
+    <button class="hot" style="left:24px;top:111px;width:86px;height:38px" onclick="go('overview')"></button>
+    <button class="hot" style="left:110px;top:111px;width:96px;height:38px" onclick="go('clinical')"></button>
+    <button class="hot" style="left:207px;top:111px;width:94px;height:38px" onclick="go('medication')"></button>
+    <button class="hot" style="left:302px;top:111px;width:86px;height:38px" onclick="go('patient-referrals')"></button>
+    <button class="hot" style="left:25px;top:164px;width:363px;height:54px" onclick="toast('Diagnosis field selected')"></button>
+    <button class="hot" style="left:25px;top:229px;width:363px;height:87px" onclick="toast('Treatment plan field selected')"></button>
+    <button class="hot" style="left:25px;top:328px;width:363px;height:87px" onclick="toast('Symptoms field selected')"></button>
+    <button class="hot" style="left:25px;top:427px;width:363px;height:87px" onclick="toast('Mental status field selected')"></button>
+  </div></section>
+
+  <section class="screen" id="medication"><img class="bg" src="Patient Details Clinical Assessment-1.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:42px;height:42px" onclick="go('clinical')"></button>
+    <button class="hot" style="left:24px;top:111px;width:86px;height:38px" onclick="go('overview')"></button>
+    <button class="hot" style="left:110px;top:111px;width:96px;height:38px" onclick="go('clinical')"></button>
+    <button class="hot" style="left:207px;top:111px;width:94px;height:38px" onclick="go('medication')"></button>
+    <button class="hot" style="left:302px;top:111px;width:86px;height:38px" onclick="go('patient-referrals')"></button>
+    <input class="form-input" style="left:25px;top:218px;width:363px;height:45px" placeholder="Search approved medications..." id="medSearch">
+    <input class="form-input" style="left:25px;top:286px;width:173px;height:45px" placeholder="Dose">
+    <select class="form-select" style="left:210px;top:286px;width:178px;height:45px"><option>Once daily</option><option>Twice daily</option><option>As needed</option></select>
+    <select class="form-select" style="left:25px;top:356px;width:173px;height:45px"><option>Oral</option><option>Topical</option></select>
+    <select class="form-select" style="left:210px;top:356px;width:178px;height:45px"><option>2 weeks</option><option>4 weeks</option><option>8 weeks</option></select>
+    <button class="hot save-hot" onclick="go('clinical');toast('Medication saved')"></button><button class="hot cancel-hot" onclick="go('clinical')"></button>
+  </div></section>
+
+  <section class="screen" id="patient-referrals"><img class="bg" src="Patient Details Referrals.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:42px;height:42px" onclick="go('overview')"></button>
+    <button class="hot" style="left:24px;top:111px;width:86px;height:38px" onclick="go('overview')"></button>
+    <button class="hot" style="left:110px;top:111px;width:96px;height:38px" onclick="go('clinical')"></button>
+    <button class="hot" style="left:207px;top:111px;width:94px;height:38px" onclick="go('medication')"></button>
+    <button class="hot" style="left:302px;top:111px;width:86px;height:38px" onclick="go('patient-referrals')"></button>
+    <select class="form-select" style="left:25px;top:205px;width:363px;height:44px"><option>Medication review</option><option>Psychiatric assessment</option><option>Follow-up</option></select>
+    <button class="hot" style="left:25px;top:270px;width:174px;height:46px" onclick="toast('Routine selected')"></button><button class="hot" style="left:214px;top:270px;width:174px;height:46px" onclick="toast('Immediate selected')"></button>
+    <textarea class="form-input" style="left:25px;top:340px;width:363px;height:92px;padding-top:10px" placeholder="Clinical summary"></textarea>
+    <button class="hot save-hot" onclick="go('overview');toast('Referral saved')"></button><button class="hot cancel-hot" onclick="go('overview')"></button>
+  </div></section>
+
+  <section class="screen" id="followup"><img class="bg" src="Follow-Up & Continuing Care.jpg"><div class="overlay">
+    <button class="hot" style="left:24px;top:59px;width:80px;height:42px" onclick="go('overview')"></button>
+    <input class="form-input" style="left:25px;top:191px;width:363px;height:43px" value="18 Sep 2025">
+    <select class="form-select" style="left:25px;top:258px;width:173px;height:43px"><option>Follow-up Session</option><option>Initial Session</option></select>
+    <select class="form-select" style="left:210px;top:258px;width:178px;height:43px"><option>In-person</option><option>Telehealth</option></select>
+    <select class="form-select" style="left:25px;top:327px;width:173px;height:43px"><option>Counseling Room</option><option>Online</option></select>
+    <select class="form-select" style="left:210px;top:327px;width:178px;height:43px"><option>45 minutes</option><option>30 minutes</option><option>60 minutes</option></select>
+    <button class="hot" style="left:25px;top:412px;width:363px;height:126px" onclick="toast('Monitoring checklist updated')"></button>
+    <button class="hot save-hot" onclick="go('overview');toast('Follow-up saved')"></button><button class="hot cancel-hot" onclick="go('overview')"></button>
+  </div></section>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+const data={
+ New:[['Sana Khan','CM-2025-000123','Psychologist','12 Aug 2025','ACTIVE CRISIS','crisis'],['Imran Ali','CM-2025-000123','CMO','12 Aug 2025','HIGH RISK','high'],['Ali Raza','CM-2025-000123','GP','12 Aug 2025','MODERATE','moderate'],['Sana Gul','CM-2025-000123','Counselor','12 Aug 2025','LOW','low'],['Laiba Khan','CM-2025-000123','CMO','12 Aug 2025','FOLLOW-UP DUE','due']],
+ 'In Progress':[['Sana Khan','CM-2025-000123','Psychologist','12 Aug 2025','ACTIVE CRISIS','crisis'],['Imran Ali','CM-2025-000123','CMO','12 Aug 2025','HIGH RISK','high'],['Ali Raza','CM-2025-000123','GP','12 Aug 2025','MODERATE','moderate']],
+ Completed:[['Laiba Khan','CM-2025-000123','CMO','12 Aug 2025','FOLLOW-UP DUE','due'],['Sana Gul','CM-2025-000123','Counselor','12 Aug 2025','LOW','low']]
+};
+let filter='New';
+function go(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active'); if(id==='referrals')renderRefs();}
+function setFilter(f){filter=f;renderRefs()}
+function renderRefs(){const q=(document.getElementById('search')?.value||'').toLowerCase();document.querySelectorAll('.dynamic-filters button').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter));let rows=data[filter].filter(r=>r.join(' ').toLowerCase().includes(q));document.getElementById('refList').innerHTML=rows.map(r=>`<div class="ref-card" onclick="go('accept')"><div class="name">${r[0]}</div><div class="id">${r[1]}</div><span class="badge ${r[5]}">${r[4]}</span><div class="meta">Referred by: ${r[2]} &nbsp;|&nbsp; ${r[3]}</div><div class="arrow">→</div></div>`).join('')||'<div style="padding:30px;text-align:center;color:#8b94a3">No referrals found</div>'}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.tt);window.tt=setTimeout(()=>t.classList.remove('show'),1500)}
+renderRefs();
+</script></body></html>
