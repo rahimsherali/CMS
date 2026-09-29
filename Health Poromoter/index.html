@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=412, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Case Management System</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#20242b;font-family:Arial,Helvetica,sans-serif}
+body{display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:0}
+#app{width:412px;height:917px;position:relative;overflow:hidden;background:#fff}
+#viewport{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+#viewport::-webkit-scrollbar{display:none}
+#stage{position:relative;width:412px;min-height:917px}
+#bg{display:block;width:412px;height:auto;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.hit{position:absolute;z-index:10;border:0;background:transparent;padding:0;margin:0;cursor:pointer}
+.hit:focus{outline:none}
+.input,.select,.ta{
+ position:absolute;z-index:20;border:0;outline:0;background:transparent;
+ color:#5e6d83;font:14px Arial,Helvetica,sans-serif;padding:0;
+}
+.input::placeholder,.ta::placeholder{color:#91a0b7;opacity:1}
+.select{appearance:none;-webkit-appearance:none;color:#91a0b7;padding-right:22px}
+.ta{resize:none;line-height:1.35}
+.radio{
+ position:absolute;z-index:21;width:20px;height:20px;margin:0;accent-color:#9dbcf2;cursor:pointer
+}
+.check{
+ position:absolute;z-index:21;width:18px;height:18px;margin:0;accent-color:#465f9d;cursor:pointer
+}
+.toast{
+ position:fixed;z-index:1000;left:50%;transform:translateX(-50%);
+ top:18px;width:330px;padding:10px 14px;border-radius:12px;
+ background:#334d91;color:white;text-align:center;font-size:12px;
+ box-shadow:0 8px 24px #0003
+}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="app"><div id="viewport"><div id="stage"></div></div></div>
+<script>
+const IMG="screens/";
+const A={
+ splash:"01 - Splash.jpg", login:"02 - Login.jpg", forgot:"03 - Forget Pass.jpg",
+ otp:"04 - OTP.jpg", reset:"05 - Reset Pass.jpg", home:"06 - Home.jpg",
+ register:"07 - Register.jpg", screening:"08 - Screening Hp.png",
+ review:"09 - Review & Submit Hp.png", caseCreated:"10 - Case created.jpg",
+ cases:"11 - My Cases.jpg", details:"12 - Cases Details.jpg",
+ followups:"13 - Follow-ups CMO.jpg", capture:"14 - Capture Follow-Up CMO.jpg",
+ followPlan:"15 - Follow-Up Plan CMO.jpg", followDone:"16 - Follow-up Recorded CMO.jpg",
+ tools:"17 - Screening Tools.jpg", toolDetail:"18 - Screening Tools Details.jpg",
+ phq:"19 - PHQ-9.jpg", phqResult:"20 - PHQ-9 Result.jpg",
+ toolsDone:"21 - Screening Tools.jpg", tasks:"22 - Tasks & Assignments.png",
+ taskCreate:"23 - Create Task.png", taskAssign:"24 - Create Task Assign To.png",
+ taskReview:"25 - Task Review & Create.png", taskDone:"26 - Task Successfully Assigned!.jpg"
+};
+let current="splash", stack=[], splashTimer=null;
+const stage=document.getElementById("stage"), viewport=document.getElementById("viewport");
+
+function resetStage(key){
+  stage.innerHTML="";
+  viewport.scrollTop=0;
+  const img=document.createElement("img");
+  img.id="bg"; img.src=IMG+A[key];
+  stage.appendChild(img);
+  stage.style.minHeight=(key==="register" ? "1369px":"917px");
+}
+function go(key, push=true){
+  if(push && current!==key) stack.push(current);
+  current=key; render();
+}
+function back(){
+  current=stack.length?stack.pop():"home"; render();
+}
+function hit(x,y,w,h,fn,label=""){
+  const b=document.createElement("button"); b.className="hit";
+  b.style.left=x+"px"; b.style.top=y+"px"; b.style.width=w+"px"; b.style.height=h+"px";
+  b.onclick=fn; if(label)b.setAttribute("aria-label",label);
+  stage.appendChild(b); return b;
+}
+function inp(x,y,w,h,type="text",name="",value="",placeholder=""){
+  const e=document.createElement("input"); e.className="input"; e.type=type;
+  e.name=name;e.value="";e.placeholder="";
+  e.style.left=x+"px";e.style.top=y+"px";e.style.width=w+"px";e.style.height=h+"px";
+  stage.appendChild(e);return e;
+}
+function ta(x,y,w,h,name="",placeholder=""){
+  const e=document.createElement("textarea");e.className="ta";e.name=name;e.placeholder="";
+  e.style.left=x+"px";e.style.top=y+"px";e.style.width=w+"px";e.style.height=h+"px";
+  stage.appendChild(e);return e;
+}
+function sel(x,y,w,h,opts,name=""){
+  const e=document.createElement("select");e.className="select";e.name=name;
+  opts.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;e.appendChild(o)});
+  e.style.left=x+"px";e.style.top=y+"px";e.style.width=w+"px";e.style.height=h+"px";
+  stage.appendChild(e);return e;
+}
+function radio(x,y,name,value,checked=false){
+  const e=document.createElement("input");e.type="radio";e.className="radio";e.name=name;e.value=value;e.checked=checked;
+  e.style.left=x+"px";e.style.top=y+"px";stage.appendChild(e);return e;
+}
+function checkbox(x,y,name,checked=false){
+  const e=document.createElement("input");e.type="checkbox";e.className="check";e.name=name;e.checked=checked;
+  e.style.left=x+"px";e.style.top=y+"px";stage.appendChild(e);return e;
+}
+function toast(t){
+  document.querySelectorAll(".toast").forEach(e=>e.remove());
+  const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1500);
+}
+function topBack(){hit(23,59,42,42,back,"Back")}
+function bottom(){
+  hit(70,838,58,61,()=>go("home"),"Home");
+  hit(140,838,58,61,()=>go("tasks"),"Tasks");
+  hit(210,838,58,61,()=>go("cases"),"Cases");
+  hit(280,838,75,61,()=>go("tools"),"More");
+}
+function searchOverlay(y=136){
+  const e=inp(67,y,285,36,"search","search","","");
+  e.addEventListener("input",()=>{});
+  return e;
+}
+
+function render(){
+  if(splashTimer){clearTimeout(splashTimer);splashTimer=null}
+  resetStage(current);
+
+  if(current==="splash"){
+    hit(0,0,412,917,()=>go("login"),"Continue");
+    splashTimer=setTimeout(()=>{if(current==="splash")go("login",false)},1100); return;
+  }
+
+  if(current==="login"){
+    inp(102,294,250,50,"email","email","","");
+    inp(102,390,250,50,"password","password","","");
+    checkbox(58,535,"remember",true);
+    hit(55,461,303,55,()=>go("home"),"Sign In");
+    hit(245,529,125,34,()=>go("forgot"),"Forgot password");
+    return;
+  }
+  if(current==="forgot"){
+    inp(102,294,250,50,"email","email","","");
+    hit(55,367,303,55,()=>go("otp"),"Continue"); topBack(); return;
+  }
+  if(current==="otp"){
+    ["7","8","6"].forEach((v,i)=>inp(107+i*45,300,35,40,"text","otp"+i,v,""));
+    hit(55,367,303,55,()=>go("reset"),"Continue"); topBack(); return;
+  }
+  if(current==="reset"){
+    inp(102,294,250,50,"password","newPassword","","");
+    inp(102,389,250,50,"password","confirmPassword","","");
+    hit(55,465,303,55,()=>go("login"),"Continue"); topBack(); return;
+  }
+
+  if(current==="home"){
+    hit(25,137,363,79,()=>go("register"),"Register New Case");
+    hit(25,496,363,78,()=>go("cases"),"My Cases");
+    hit(25,589,363,78,()=>go("followups"),"Follow-ups");
+    hit(25,232,176,116,()=>toast("New Cases"));
+    hit(211,232,177,116,()=>toast("Active Cases"));
+    hit(25,363,176,116,()=>go("followups"),"Follow-ups Due");
+    hit(211,363,177,116,()=>toast("LTFUs Cases"));
+    bottom(); return;
+  }
+
+  if(current==="register"){
+    // Exact overlays on the existing design; the background itself is untouched.
+    inp(42,309,328,50,"text","fullName","","Enter full name");
+    sel(42,401,160,51,["Select age","16","17","18","19","20"],"age");
+    inp(210,401,160,51,"tel","phone","","03xx xxx xxxx");
+    hit(24,492,117,50,()=>toast("Male selected"),"Male");
+    hit(148,492,117,50,()=>toast("Female selected"),"Female");
+    hit(302,492,86,50,()=>toast("Other selected"),"Other");
+    sel(42,583,160,50,["Select region","Gilgit","Hunza","Skardu"],"region");
+    sel(210,583,160,50,["Select Local","Gojal","Booni","Ghizer"],"local");
+    sel(42,674,160,50,["Select village","Village 1","Village 2"],"village");
+    sel(210,674,160,50,["Select jk","JK 1","JK 2"],"jk");
+    inp(42,765,328,50,"text","education","","Employment / Education");
+    sel(42,855,160,50,["Select","Married","Single","Divorced"],"marital");
+    sel(210,855,160,50,["Select","0","1","2","3+"],"children");
+    inp(42,946,328,50,"text","languages","","Languages");
+    sel(42,1037,160,50,["Select","Yes","No"],"insurance");
+    sel(210,1037,160,50,["Select","Government","Private","Other"],"source");
+    sel(42,1128,160,50,["Select","Yes","No"],"priorTreatment");
+    sel(210,1128,160,50,["Select","Yes","No"],"connectedCare");
+    inp(42,1219,328,50,"text","provider","","Care provider name");
+    hit(55,1296,302,57,()=>go("screening"),"Next"); topBack(); return;
+  }
+
+  if(current==="screening"){
+    const ys=[292,378,466,553,640];
+    ys.forEach((y,i)=>hit(24,y,364,77,()=>go("toolDetail"),"Screening Tool"));
+    hit(42,727,327,67,()=>toast("Risk level selected"),"Risk Level");
+    hit(55,846,302,55,()=>go("review"),"Next"); topBack(); return;
+  }
+  if(current==="review"){
+    hit(55,846,302,55,()=>go("caseCreated"),"Submit"); topBack(); return;
+  }
+  if(current==="caseCreated"){
+    hit(55,654,302,53,()=>go("details"),"View Case Details");
+    hit(55,722,302,55,()=>go("home"),"Back to Dashboard"); return;
+  }
+
+  if(current==="cases"){
+    searchOverlay(135);
+    const filterY=191;
+    hit(24,191,66,42,()=>toast("All cases"),"All");
+    hit(99,191,74,42,()=>toast("New cases"),"New");
+    hit(181,191,88,42,()=>toast("Active cases"),"Active");
+    hit(278,191,112,42,()=>toast("High Risk cases"),"High Risk");
+    // exact cards
+    hit(24,248,364,97,()=>go("details"),"Case CM-2025-000567");
+    hit(24,354,364,97,()=>go("details"),"Case CM-2025-000123");
+    hit(24,460,364,97,()=>go("details"),"Case CM-2025-000231");
+    hit(24,566,364,97,()=>go("details"),"Case CM-2025-000453");
+    hit(24,671,364,97,()=>go("details"),"Case CM-2025-000123");
+    topBack(); bottom(); return;
+  }
+  if(current==="details"){
+    hit(24,404,364,55,()=>go("tools"),"Screening Tools");
+    topBack(); bottom(); return;
+  }
+
+  if(current==="followups"){
+    searchOverlay(215);
+    hit(24,274,66,42,()=>toast("All follow-ups"),"All");
+    hit(99,274,119,42,()=>toast("Upcoming follow-ups"),"Upcoming");
+    hit(226,274,96,42,()=>toast("Due Today"),"Due Today");
+    hit(328,274,84,42,()=>toast("Overdue"),"Overdue");
+    hit(24,332,364,100,()=>go("capture"),"Sana Khan");
+    hit(24,443,364,100,()=>go("capture"),"Ali Raza");
+    hit(24,555,364,100,()=>go("capture"),"Sana Gul");
+    hit(24,666,364,100,()=>go("capture"),"Ali Raza Missed");
+    hit(24,133,364,63,()=>go("capture"),"Add Follow-ups");
+    topBack(); bottom(); return;
+  }
+  if(current==="capture"){
+    inp(47,337,318,50,"date","contactDate","2025-09-18","");
+    sel(47,428,318,50,["Reached","Not Reached"],"contactAttempt");
+    hit(24,519,80,50,()=>toast("Phone selected"),"Phone");
+    hit(115,519,89,50,()=>toast("In Person selected"),"In Person");
+    hit(216,519,80,50,()=>toast("SMS selected"),"SMS");
+    hit(307,519,80,50,()=>toast("Other selected"),"Other");
+    ta(47,609,318,80,"statusNotes","Free text");
+    hit(42,708,105,45,()=>toast("Yes"),"Yes");
+    hit(152,708,100,45,()=>toast("No"),"No");
+    hit(55,846,302,55,()=>go("followPlan"),"Save & Next"); topBack(); return;
+  }
+  if(current==="followPlan"){
+    hit(340,190,28,22,()=>toast("Schedule toggled"),"Schedule next follow-up");
+    inp(65,250,298,50,"date","nextDate","2025-09-18","");
+    inp(65,340,298,50,"time","nextTime","10:00","");
+    sel(65,429,298,50,["Ongoing support and monitoring","Case review","Other"],"reason");
+    ta(65,518,298,80,"followNotes","Free text");
+    hit(318,630,35,24,()=>toast("Reminder toggled"),"Set Reminder");
+    sel(98,676,250,42,["1 day before","2 days before","3 days before"],"reminder");
+    hit(55,849,145,55,back,"Cancel");
+    hit(210,849,147,55,()=>go("followDone"),"Save"); topBack(); return;
+  }
+  if(current==="followDone"){
+    hit(55,654,302,53,()=>go("details"),"View Case Details");
+    hit(55,722,302,55,()=>go("followups"),"Back to Follow-Ups"); return;
+  }
+
+  if(current==="tools"){
+    hit(24,199,364,77,()=>go("toolDetail"),"PHQ-9");
+    hit(24,286,364,77,()=>go("toolDetail"),"PHQ-2");
+    hit(24,372,364,77,()=>go("toolDetail"),"GAD-2");
+    hit(24,459,364,77,()=>go("toolDetail"),"GAD-7");
+    hit(24,546,364,77,()=>go("toolDetail"),"DASS-21");
+    topBack(); return;
+  }
+  if(current==="toolDetail"){
+    hit(55,846,302,55,()=>go("phq"),"Start Assessment"); topBack(); return;
+  }
+  if(current==="phq"){
+    radio(43,263,"phq","0",true); radio(43,298,"phq","1"); radio(43,333,"phq","2"); radio(43,368,"phq","3");
+    hit(55,846,147,55,back,"Previous");
+    hit(210,846,147,55,()=>go("phqResult"),"Next");
+    topBack(); return;
+  }
+  if(current==="phqResult"){
+    hit(55,846,302,55,()=>go("toolsDone"),"Save & Continue"); topBack(); return;
+  }
+  if(current==="toolsDone"){
+    hit(55,846,302,55,()=>go("tools"),"View All Tools"); topBack(); return;
+  }
+
+  if(current==="tasks"){
+    hit(24,145,364,62,()=>go("taskCreate"),"Create New Task");
+    hit(24,222,80,42,()=>toast("All tasks"),"All");
+    hit(113,222,125,42,()=>toast("Due Today"),"Due Today");
+    hit(249,222,125,42,()=>toast("Overdue"),"Overdue");
+    hit(24,278,364,98,()=>go("taskCreate"),"Complete PHQ-9 assessment");
+    hit(24,385,364,98,()=>go("taskCreate"),"Psychiatrist referral review");
+    hit(24,492,364,98,()=>go("taskCreate"),"Follow-up call");
+    hit(24,599,364,98,()=>go("taskCreate"),"Case discussion meeting");
+    topBack(); bottom(); return;
+  }
+  if(current==="taskCreate"){
+    inp(47,315,318,54,"text","taskTitle","Complete PHQ-9 assessment","");
+    inp(47,407,318,52,"text","description","","Free text");
+    sel(47,498,318,51,["Sana Khan | CM-2025-000123","Imran Khan | CM-2025-000123"],"patient");
+    sel(47,589,318,51,["Clinical Assessment","Follow-up","Case Review"],"taskType");
+    hit(24,680,114,52,()=>toast("High"),"High");
+    hit(149,680,114,52,()=>toast("Medium"),"Medium");
+    hit(274,680,114,52,()=>toast("Low"),"Low");
+    inp(47,772,318,51,"date","dueDate","2025-09-18","");
+    hit(55,846,302,55,()=>go("taskAssign"),"Next"); topBack(); return;
+  }
+  if(current==="taskAssign"){
+    sel(47,315,318,51,["Psychologist","CMO","Psychiatrist"],"role");
+    hit(47,407,318,52,()=>toast("User selected"),"User");
+    checkbox(47,520,"helpline",true); checkbox(47,555,"clinical"); checkbox(47,590,"programme");
+    hit(55,846,302,55,()=>go("taskReview"),"Next"); topBack(); return;
+  }
+  if(current==="taskReview"){
+    hit(55,846,147,55,back,"Back"); hit(210,846,147,55,()=>go("taskDone"),"Assign"); topBack(); return;
+  }
+  if(current==="taskDone"){
+    hit(55,720,302,53,()=>go("tasks"),"View Task Details");
+    hit(55,787,302,55,()=>go("home"),"Back to Dashboard"); return;
+  }
+}
+render();
+</script>
+</body>
+</html>
